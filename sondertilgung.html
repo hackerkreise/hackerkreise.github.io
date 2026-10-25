@@ -106,6 +106,8 @@ details.card[open] > summary { margin-bottom: 10px; }
 input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
 .hint { font-size: 13px; color: var(--text-3); margin: 4px 0 0; }
 .range-hint { display: flex; justify-content: space-between; margin: 0 0 4px; }
+.field-note { margin: 0 0 6px; }
+.field-note b { color: var(--text-2); font-weight: 600; }
 .warn { background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-top: 8px; }
 .warn:empty { display: none; }
 
@@ -151,7 +153,7 @@ footer.note ul { margin: 4px 0; padding-left: 20px; }
     <a href="sondertilgung.html" aria-current="page">Sondertilgung oder ETF</a>
   </nav>
   <h1>Sondertilgung oder ETF?</h1>
-  <p>Jährliche Sondertilgung, ETF-Sparplan oder eine Mischung – Restschuld und Nettovermögen über die Zeit, alle Werte werden live berechnet.</p>
+  <p>Wohin mit dem jährlichen Extra-Betrag: alles in die Sondertilgung, alles in einen ETF-Sparplan oder aufteilen? Restschuld und Nettovermögen über die Zeit, alle Werte werden live berechnet.</p>
 </header>
 
 <div class="sticky-result" aria-live="polite">
@@ -167,11 +169,16 @@ footer.note ul { margin: 4px 0; padding-left: 20px; }
     </details>
 
     <details class="card" open>
-      <summary>Sondertilgung</summary>
+      <summary>Extra-Betrag</summary>
       <div id="grp-sonder"></div>
       <label class="check"><input type="checkbox" id="nachZinsbindungWeiter" checked>
-        <span>Jährlichen Betrag auch nach der Zinsbindung einsetzen</span></label>
+        <span>Extra-Betrag auch nach der Zinsbindung weiter einsetzen</span></label>
       <div class="warn" id="stWarn"></div>
+    </details>
+
+    <details class="card" open>
+      <summary>Szenario „Aufteilen“</summary>
+      <div id="grp-aufteilen"></div>
     </details>
 
     <details class="card" open>
@@ -200,20 +207,20 @@ footer.note ul { margin: 4px 0; padding-left: 20px; }
     <section class="card">
       <h2>Restschuld über die Zeit</h2>
       <div class="legend" id="legend1"></div>
-      <div class="chart-box"><canvas id="chart1" aria-label="Restschuld der Szenarien A, B und C"></canvas></div>
+      <div class="chart-box"><canvas id="chart1" aria-label="Restschuld der Szenarien Alles tilgen, Alles in ETF und Aufteilen"></canvas></div>
     </section>
 
     <section class="card">
       <h2>Nettovermögen über die Zeit</h2>
       <div class="legend" id="legend2"></div>
-      <div class="chart-box"><canvas id="chart2" aria-label="Nettovermögen der Szenarien A, B und C"></canvas></div>
+      <div class="chart-box"><canvas id="chart2" aria-label="Nettovermögen der Szenarien Alles tilgen, Alles in ETF und Aufteilen"></canvas></div>
     </section>
 
     <section class="card">
-      <h2>Vorteil ETF vs. Sondertilgung nach ETF-Rendite und Anschlusszins</h2>
+      <h2>Wann lohnt sich was?</h2>
       <div class="legend">
-        <span><i class="sw" style="background:rgb(var(--cell-etf))"></i>ETF (B) besser</span>
-        <span><i class="sw" style="background:rgb(var(--cell-st))"></i>Sondertilgung (A) besser</span>
+        <span><i class="sw" style="background:rgb(var(--cell-etf))"></i>Alles in ETF besser</span>
+        <span><i class="sw" style="background:rgb(var(--cell-st))"></i>Alles tilgen besser</span>
         <span><i class="sw line"></i>Break-even-Linie</span>
         <span id="heatHint"></span>
       </div>
@@ -228,7 +235,7 @@ footer.note ul { margin: 4px 0; padding-left: 20px; }
     <li>Konstante ETF-Rendite, keine Kosten (Depot, Order, TER) und keine Vorabpauschale.</li>
     <li>Kein Sparerpauschbetrag/Freibetrag, keine Kirchensteuer. Steuer = Gewinn × (1 − Teilfreistellung) × Steuersatz bei fiktivem Verkauf zum jeweiligen Zeitpunkt.</li>
     <li>Sondertilgung bzw. ETF-Einzahlung einmal jährlich am Jahresende; die Rate bleibt auch nach der Zinsbindung gleich.</li>
-    <li>Ist der Kredit getilgt, fließen frei werdende Rate und Sondertilgungsbetrag in den ETF – alle Szenarien setzen jeden Monat gleich viel Geld ein.</li>
+    <li>Ist der Kredit getilgt, fließen frei werdende Rate und Extra-Betrag in den ETF – alle Szenarien setzen jeden Monat gleich viel Geld ein.</li>
     <li>Nettovermögen = ETF-Depot nach Steuern − Restschuld (ohne Wert der Immobilie).</li>
   </ul>
   <p>Eigene Vorgabewerte können lokal in <code>local.env</code> hinterlegt werden; diese Datei wird nicht eingecheckt. Außer Chart.js (CDN) lädt die Seite nichts nach, kein Tracking.</p>
@@ -280,8 +287,9 @@ const FIELDS = [
   { id: "tilgung",             env: "INITIAL_REPAYMENT",         grp: "kredit",    label: "Anfängliche Tilgung",           def: 2,      unit: "% p.a.", kind: "pct",   min: 0 },
   { id: "zinsbindungJahre",    env: "FIXED_TERM_YEARS",          grp: "kredit",    label: "Zinsbindung",                   def: 10,     unit: "Jahre",  kind: "int",   min: 1, max: 40 },
   // Sondertilgung
-  { id: "sondertilgungPct",    env: "MAX_SPECIAL_REPAYMENT_PCT", grp: "sonder",    label: "Max. Sondertilgung pro Jahr",   def: 5,      unit: "% d. Kredits", kind: "pct", min: 0, max: 100 },
-  { id: "anteilSondertilgung",                                   grp: "sonder",    label: "Szenario C: Anteil Sondertilgung", def: 50,  unit: "%",      kind: "pct",   min: 0, max: 100, range: [0, 100, 5] },
+  { id: "sondertilgungPct",    env: "MAX_SPECIAL_REPAYMENT_PCT", grp: "sonder",    label: "Extra-Betrag pro Jahr",         def: 5,      unit: "% d. Kredits", kind: "pct", min: 0, max: 100, note: true },
+  // Szenario „Aufteilen“
+  { id: "anteilSondertilgung",                                   grp: "aufteilen", label: "Davon in Sondertilgung",        def: 50,     unit: "%",      kind: "pct",   min: 0, max: 100, range: [0, 100, 5], rangeLabels: ["Alles in ETF", "Alles tilgen"], note: true },
   // ETF
   { id: "etfRendite",          env: "ETF_RETURN",                grp: "etf",       label: "Erwartete Rendite",             def: 6,      unit: "% p.a.", kind: "pct" },
   { id: "steuersatz",          env: "TAX_RATE",                  grp: "etf",       label: "Abgeltungsteuer inkl. Soli",    def: 26.375, unit: "%",      kind: "pct",   min: 0, max: 100 },
@@ -336,7 +344,8 @@ function buildForm() {
     wrap.innerHTML = `<div class="field"><label for="${f.id}">${f.label}</label>
       <div class="inp"><input type="text" id="${f.id}" inputmode="${f.kind === "int" ? "numeric" : "decimal"}" autocomplete="off"><span class="unit">${f.unit}</span></div></div>` +
       (f.range ? `<input type="range" id="${f.id}Range" min="${f.range[0]}" max="${f.range[1]}" step="${f.range[2]}" aria-label="${f.label} Schieberegler">
-      <div class="hint range-hint"><span>${f.range[0]} ${f.unit}</span><span>${f.range[1]} ${f.unit}</span></div>` : "");
+      <div class="hint range-hint">${(f.rangeLabels || [`${f.range[0]} ${f.unit}`, `${f.range[1]} ${f.unit}`]).map(t => `<span>${t}</span>`).join("")}</div>` : "") +
+      (f.note ? `<p class="hint field-note" id="${f.id}Note"></p>` : "");
     $("grp-" + f.grp).appendChild(wrap);
     const el = $(f.id);
     el.value = formatForInput(f.def, f.kind);
@@ -389,20 +398,32 @@ function readInputs() {
 let lastResult = null;
 
 const SC = [
-  { key: "a", name: "A: Sondertilgung", color: "var(--sonder)", token: "--sonder" },
-  { key: "b", name: "B: ETF",           color: "var(--etf)",    token: "--etf" },
-  { key: "c", name: "C: Mischung",      color: "var(--mix)",    token: "--mix" },
+  { key: "a", name: "Alles tilgen", color: "var(--sonder)", token: "--sonder" },
+  { key: "b", name: "Alles in ETF", color: "var(--etf)",    token: "--etf" },
+  { key: "c", name: "Aufteilen",    color: "var(--mix)",    token: "--mix" },
 ];
-const scName = (s, r) => s.key === "c" ? `${s.name} (${fmtNum(r.p.anteilSondertilgung, 1)} % ST)` : s.name;
+const scName = (s, r) => s.key === "c" ? `${s.name} (${fmtNum(r.p.anteilSondertilgung, 1)} % tilgen)` : s.name;
+
+/** Extra-Betrag pro Jahr im Szenario „Aufteilen“: [tilgen, ETF]. */
+const splitBudget = r => {
+  const st = r.a.budget * r.p.anteilSondertilgung / 100;
+  return [st, r.a.budget - st];
+};
 
 function winnerText(vorteilEtf) {
   if (Math.abs(vorteilEtf) < 0.5) return { name: "Gleichstand", color: "var(--neutral)" };
-  return vorteilEtf > 0 ? { name: "ETF", color: "var(--etf)" } : { name: "Sondertilgung", color: "var(--sonder)" };
+  return vorteilEtf > 0 ? { name: SC[1].name, color: SC[1].color } : { name: SC[0].name, color: SC[0].color };
 }
 
 function breakEvenText(be) {
   if (be === null || be === undefined) return { v: "–", s: "kein Wechsel zwischen −20 und 40 %" };
-  return { v: pct(be), s: "darüber ETF besser, darunter Sondertilgung" };
+  return { v: pct(be), s: "darüber lohnt der ETF, darunter das Tilgen" };
+}
+
+function renderNotes(r) {
+  const [st, etf] = splitBudget(r);
+  $("sondertilgungPctNote").innerHTML = `= <b>${eur(r.a.budget)} pro Jahr</b> zusätzlich zur Rate – für Sondertilgung, ETF oder beides. Meist durch den Kreditvertrag begrenzt (oft 5 %).`;
+  $("anteilSondertilgungNote").innerHTML = `Pro Jahr <b>${eur(st)} tilgen</b> · <b>${eur(etf)} in ETF</b>`;
 }
 
 function renderTiles(r) {
@@ -410,19 +431,19 @@ function renderTiles(r) {
   const be = breakEvenText(r.breakEven);
   const jahre = r.a.monate / 12;
   const tiles = [
-    { hero: true, k: `Differenz Nettovermögen nach ${fmtNum(jahre, 0)} Jahren (B − A)`,
+    { hero: true, k: `Vorsprung beim Nettovermögen nach ${fmtNum(jahre, 0)} Jahren`,
       v: `<span class="dot" style="background:${w.color}"></span>${w.name} +${eur(Math.abs(r.differenzNetto))}`,
-      s: `Nettovermögen A ${eur(r.a.nettovermoegen)} · B ${eur(r.b.nettovermoegen)} · C ${eur(r.c.nettovermoegen)}` },
+      s: SC.map(s => `${s.name} ${eur(r[s.key].nettovermoegen)}`).join(" · ") },
     { k: "Break-even-ETF-Rendite", v: be.v, s: be.s },
-    { k: "Gesparte Zinsen durch Sondertilgung", v: eur(r.gesparteZinsen), s: `A gegenüber B über ${fmtNum(jahre, 0)} Jahre` },
-    { k: "Restschuld Ende Zinsbindung (A)", v: eur(r.a.schuldBindung), s: `B ${eur(r.b.schuldBindung)} · C ${eur(r.c.schuldBindung)}` },
-    { k: "Monatsrate", v: eur2(r.a.rate), s: `Jahresbetrag ${eur(r.a.budget)}` },
-    { k: "Nettovermögen C (Mischung)", v: eur(r.c.nettovermoegen), s: `${fmtNum(r.p.anteilSondertilgung, 1)} % Sondertilgung, Rest ETF` },
+    { k: "Gesparte Zinsen durch Tilgen", v: eur(r.gesparteZinsen), s: `Alles tilgen vs. Alles in ETF, über ${fmtNum(jahre, 0)} Jahre` },
+    { k: "Restschuld Ende Zinsbindung bei Alles tilgen", v: eur(r.a.schuldBindung), s: `Alles in ETF ${eur(r.b.schuldBindung)} · Aufteilen ${eur(r.c.schuldBindung)}` },
+    { k: "Monatsrate", v: eur2(r.a.rate), s: `plus Extra-Betrag ${eur(r.a.budget)} / Jahr` },
+    { k: "Nettovermögen bei Aufteilen", v: eur(r.c.nettovermoegen), s: `pro Jahr ${splitBudget(r).map(eur).join(" tilgen + ")} in ETF` },
   ];
   $("tiles").innerHTML = tiles.map(t => `<div class="tile${t.hero ? " hero" : ""}"><div class="k">${t.k}</div><div class="v">${t.v}</div><div class="s">${t.s}</div></div>`).join("");
 
   $("stickyResult").innerHTML = `<span><span class="dot" style="background:${w.color}"></span><b>${w.name} +${eur(Math.abs(r.differenzNetto))}</b></span>
-    <span>Break-even ${be.v}</span><span>Mischung ${eur(r.c.nettovermoegen)}</span>`;
+    <span>Break-even ${be.v}</span><span>Aufteilen ${eur(r.c.nettovermoegen)}</span>`;
 }
 
 function renderScenarioTable(r) {
@@ -444,7 +465,7 @@ function renderScenarioTable(r) {
 
 function renderWarnings(r) {
   const w = [];
-  if (r.a.budget === 0) w.push("Ohne Sondertilgungsbetrag sind alle Szenarien gleich.");
+  if (r.a.budget === 0) w.push("Ohne Extra-Betrag sind alle Szenarien gleich.");
   if (SC.some(s => r[s.key].negativeTilgung)) w.push("Die Rate deckt nach der Zinsbindung nicht die Zinsen – die Restschuld wächst.");
   if (r.p.horizontJahre < r.p.zinsbindungJahre) w.push("Horizont ist kürzer als die Zinsbindung – gerechnet wird bis zum Ende der Zinsbindung.");
   $("stWarn").innerHTML = w.join("<br>");
@@ -531,16 +552,16 @@ function renderHeatmap(inp) {
     row.werte.forEach((v, j) => {
       const alpha = 0.12 + 0.6 * Math.sqrt(Math.abs(v) / maxAbs);
       const rgb = v >= 0 ? "var(--cell-etf)" : "var(--cell-st)";
-      const who = v >= 0 ? "ETF" : "Sondertilgung";
+      const who = v >= 0 ? SC[1].name : SC[0].name;
       const cls = [];
       if (renditen[j] === curR && row.anschlusszins === curZ) cls.push("cur");
       if (j > 0 && Math.sign(v) !== Math.sign(row.werte[j - 1])) cls.push("be");
-      html += `<td class="${cls.join(" ")}" style="background:rgba(${rgb},${alpha.toFixed(2)})" title="${who} besser um ${eur(Math.abs(v))} (Rendite ${renditen[j]} %, Anschlusszins ${row.anschlusszins} %)">${v >= 0 ? "ETF" : "ST"} ${fmtNum(Math.abs(v) / 1000, 0)}&nbsp;T€</td>`;
+      html += `<td class="${cls.join(" ")}" style="background:rgba(${rgb},${alpha.toFixed(2)})" title="${who} besser um ${eur(Math.abs(v))} (Rendite ${renditen[j]} %, Anschlusszins ${row.anschlusszins} %)">${v >= 0 ? "ETF" : "Tilgen"} ${fmtNum(Math.abs(v) / 1000, 0)}&nbsp;T€</td>`;
     });
     html += `<td class="be-col">${row.breakEven === null ? "–" : pct(row.breakEven, 1)}</td></tr>`;
   }
   $("heatTable").innerHTML = html + "</tbody>";
-  $("heatHint").textContent = `Wert = Differenz Nettovermögen B − A nach ${fmtNum(Math.max(inp.horizontJahre, inp.zinsbindungJahre), 0)} Jahren. Umrandet: aktuelle Eingabe (gerundet).`;
+  $("heatHint").textContent = `Vorsprung beim Nettovermögen nach ${fmtNum(Math.max(inp.horizontJahre, inp.zinsbindungJahre), 0)} Jahren, je nach ETF-Rendite und Anschlusszins. Umrandet: aktuelle Eingabe (gerundet).`;
 }
 
 /* =====================================================================
@@ -558,6 +579,7 @@ function recalc() {
     const r = runModel(inp);
     lastResult = r;
     renderWarnings(r);
+    renderNotes(r);
     renderTiles(r);
     renderScenarioTable(r);
     renderCharts(r);
