@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sondertilgung oder ETF</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="sondertilgung-calc.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f1;
+  --surface: #fcfcfb;
+  --surface-2: #efeee9;
+  --border: #dddcd5;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --text-3: #7a7974;
+  --accent: #2a78d6;
+  --sonder: #2a78d6;
+  --etf: #1baf7a;
+  --mix: #c9771e;
+  --neutral: #8a8984;
+  --warn-bg: #fff4dc;
+  --warn-text: #7a5200;
+  --bad: #c43c3b;
+  --cell-etf: 27, 175, 122;
+  --cell-st: 42, 120, 214;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #121211;
+    --surface: #1a1a19;
+    --surface-2: #242422;
+    --border: #34332f;
+    --text: #f0efec;
+    --text-2: #c3c2b7;
+    --text-3: #918f86;
+    --accent: #3987e5;
+    --sonder: #3987e5;
+    --etf: #199e70;
+    --mix: #e0913a;
+    --neutral: #8a8984;
+    --warn-bg: #3a2c0c;
+    --warn-text: #f3cf86;
+    --bad: #e66767;
+    --cell-etf: 25, 158, 112;
+    --cell-st: 57, 135, 229;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+header.top { padding: 20px 16px 8px; max-width: 1280px; margin: 0 auto; }
+header.top h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+header.top p { margin: 0; color: var(--text-2); }
+nav.pages { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 10px; font-size: 14px; }
+nav.pages a { color: var(--accent); text-decoration: none; }
+nav.pages a:hover { text-decoration: underline; }
+nav.pages a[aria-current] { color: var(--text); font-weight: 600; }
+
+/* Sticky Kurz-Ergebnis (vor allem fürs Handy) */
+.sticky-result {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px; font-size: 14px;
+}
+.sticky-result .inner { max-width: 1280px; margin: 0 auto; display: flex; gap: 6px 16px; flex-wrap: wrap; align-items: baseline; }
+.sticky-result b { font-size: 15px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+
+main.layout { max-width: 1280px; margin: 0 auto; padding: 12px 16px 40px; display: grid; gap: 16px; }
+@media (min-width: 980px) {
+  main.layout { grid-template-columns: 380px minmax(0, 1fr); align-items: start; }
+  .inputs-col { position: sticky; top: 56px; max-height: calc(100vh - 64px); overflow-y: auto; padding-right: 4px; }
+}
+.inputs-col, .results-col { display: grid; gap: 16px; min-width: 0; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.card h2 { font-size: 16px; margin: 0 0 10px; }
+details.card > summary { cursor: pointer; font-weight: 600; font-size: 16px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::after { content: "▾"; color: var(--text-3); transition: transform .15s; }
+details.card:not([open]) > summary::after { transform: rotate(-90deg); }
+details.card[open] > summary { margin-bottom: 10px; }
+
+.field { display: grid; grid-template-columns: 1fr 140px; gap: 8px; align-items: center; padding: 5px 0; }
+.field label { color: var(--text-2); font-size: 14px; }
+.inp { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.inp:focus-within { outline: 2px solid var(--accent); outline-offset: -1px; }
+.inp input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 16px; padding: 8px 6px 8px 10px; text-align: right; font-variant-numeric: tabular-nums; }
+.inp input:focus { outline: none; }
+.inp .unit { padding: 0 10px 0 2px; color: var(--text-3); font-size: 14px; white-space: nowrap; }
+.inp.invalid { border-color: var(--bad); }
+.check { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; color: var(--text-2); font-size: 14px; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); flex: none; }
+input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
+.hint { font-size: 13px; color: var(--text-3); margin: 4px 0 0; }
+.range-hint { display: flex; justify-content: space-between; margin: 0 0 4px; }
+.warn { background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-top: 8px; }
+.warn:empty { display: none; }
+
+/* Kennzahlen */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.tile .k { font-size: 13px; color: var(--text-2); }
+.tile .v { font-size: 20px; font-weight: 650; margin-top: 2px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.tile .s { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.tile.hero { grid-column: 1 / -1; }
+.tile.hero .v { font-size: 28px; }
+@media (min-width: 640px) { .tile.hero { grid-column: span 2; } }
+
+/* Tabellen */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 8px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { color: var(--text-2); font-weight: 600; font-size: 13px; }
+.sens td, .sens th { text-align: center; font-size: 12.5px; padding: 6px 5px; }
+.sens td { border: 2px solid var(--surface); border-radius: 4px; color: var(--text); }
+.sens th:first-child, .sens td:first-child { text-align: left; }
+.sens td.cur { outline: 2px solid var(--text); outline-offset: -2px; }
+.sens td.be { box-shadow: inset 4px 0 0 var(--text); }
+.sens td.be-col { color: var(--text-2); font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text-2); margin: 4px 0 10px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.sw.line { height: 12px; width: 4px; border-radius: 0; background: var(--text); }
+
+.chart-box { position: relative; height: 280px; }
+@media (min-width: 640px) { .chart-box { height: 320px; } }
+
+footer.note { max-width: 1280px; margin: 0 auto; padding: 0 16px 32px; color: var(--text-3); font-size: 13px; }
+footer.note p { margin: 4px 0; }
+footer.note ul { margin: 4px 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <nav class="pages" aria-label="Rechner">
+    <a href="index.html">Bausparer oder ETF</a>
+    <a href="sondertilgung.html" aria-current="page">Sondertilgung oder ETF</a>
+  </nav>
+  <h1>Sondertilgung oder ETF?</h1>
+  <p>Jährliche Sondertilgung, ETF-Sparplan oder eine Mischung – Restschuld und Nettovermögen über die Zeit, alle Werte werden live berechnet.</p>
+</header>
+
+<div class="sticky-result" aria-live="polite">
+  <div class="inner" id="stickyResult">–</div>
+</div>
+
+<main class="layout">
+  <!-- ===================== EINGABEN ===================== -->
+  <div class="inputs-col">
+    <details class="card" open>
+      <summary>Immobilienkredit</summary>
+      <div id="grp-kredit"></div>
+    </details>
+
+    <details class="card" open>
+      <summary>Sondertilgung</summary>
+      <div id="grp-sonder"></div>
+      <label class="check"><input type="checkbox" id="nachZinsbindungWeiter" checked>
+        <span>Jährlichen Betrag auch nach der Zinsbindung einsetzen</span></label>
+      <div class="warn" id="stWarn"></div>
+    </details>
+
+    <details class="card" open>
+      <summary>ETF</summary>
+      <div id="grp-etf"></div>
+    </details>
+
+    <details class="card" open>
+      <summary>Anschlussfinanzierung &amp; Horizont</summary>
+      <div id="grp-anschluss"></div>
+    </details>
+  </div>
+
+  <!-- ===================== ERGEBNISSE ===================== -->
+  <div class="results-col">
+    <section>
+      <div class="tiles" id="tiles"></div>
+    </section>
+
+    <section class="card">
+      <h2>Szenarien im Überblick</h2>
+      <div class="table-wrap"><table id="scTable"></table></div>
+      <p class="hint" id="scHint"></p>
+    </section>
+
+    <section class="card">
+      <h2>Restschuld über die Zeit</h2>
+      <div class="legend" id="legend1"></div>
+      <div class="chart-box"><canvas id="chart1" aria-label="Restschuld der Szenarien A, B und C"></canvas></div>
+    </section>
+
+    <section class="card">
+      <h2>Nettovermögen über die Zeit</h2>
+      <div class="legend" id="legend2"></div>
+      <div class="chart-box"><canvas id="chart2" aria-label="Nettovermögen der Szenarien A, B und C"></canvas></div>
+    </section>
+
+    <section class="card">
+      <h2>Vorteil ETF vs. Sondertilgung nach ETF-Rendite und Anschlusszins</h2>
+      <div class="legend">
+        <span><i class="sw" style="background:rgb(var(--cell-etf))"></i>ETF (B) besser</span>
+        <span><i class="sw" style="background:rgb(var(--cell-st))"></i>Sondertilgung (A) besser</span>
+        <span><i class="sw line"></i>Break-even-Linie</span>
+        <span id="heatHint"></span>
+      </div>
+      <div class="table-wrap"><table class="sens" id="heatTable"></table></div>
+    </section>
+  </div>
+</main>
+
+<footer class="note">
+  <p><b>Hinweis:</b> Modellrechnung, keine Finanzberatung. Annahmen:</p>
+  <ul>
+    <li>Konstante ETF-Rendite, keine Kosten (Depot, Order, TER) und keine Vorabpauschale.</li>
+    <li>Kein Sparerpauschbetrag/Freibetrag, keine Kirchensteuer. Steuer = Gewinn × (1 − Teilfreistellung) × Steuersatz bei fiktivem Verkauf zum jeweiligen Zeitpunkt.</li>
+    <li>Sondertilgung bzw. ETF-Einzahlung einmal jährlich am Jahresende; die Rate bleibt auch nach der Zinsbindung gleich.</li>
+    <li>Ist der Kredit getilgt, fließen frei werdende Rate und Sondertilgungsbetrag in den ETF – alle Szenarien setzen jeden Monat gleich viel Geld ein.</li>
+    <li>Nettovermögen = ETF-Depot nach Steuern − Restschuld (ohne Wert der Immobilie).</li>
+  </ul>
+  <p>Eigene Vorgabewerte können lokal in <code>local.env</code> hinterlegt werden; diese Datei wird nicht eingecheckt. Außer Chart.js (CDN) lädt die Seite nichts nach, kein Tracking.</p>
+</footer>
+
+<script>
+"use strict";
+
+const { runModel, heatmap } = SondertilgungCalc;
+
+/* =====================================================================
+   1) FORMATIERUNG & PARSING (deutsches Zahlenformat)
+   ===================================================================== */
+
+const fmtEUR = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const fmtEUR2 = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtNum = (v, maxDec = 2) => new Intl.NumberFormat("de-DE", { maximumFractionDigits: maxDec }).format(v);
+const eur = v => fmtEUR.format(Math.round(v));
+const eur2 = v => fmtEUR2.format(v);
+const pct = (v, d = 2) => new Intl.NumberFormat("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d }).format(v) + " %";
+const monthsText = m => {
+  const y = Math.floor(m / 12), r = m % 12;
+  return `${y} J.${r ? " " + r + " M." : ""}`;
+};
+
+/**
+ * Wandelt eine deutsche Eingabe in eine Zahl um.
+ * kind "money"/"int": Punkte sind Tausendertrenner ("300.000" → 300000).
+ * sonst: Komma ist Dezimaltrenner; ein Punkt ohne Komma wird ebenfalls als Dezimaltrenner akzeptiert ("4.5").
+ */
+function parseDe(str, kind) {
+  let s = String(str).trim().replace(/\s|€|%/g, "");
+  if (s === "") return NaN;
+  if (kind === "money" || kind === "int" || s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  if (!/^-?\d*\.?\d+$/.test(s)) return NaN;
+  return Number(s);
+}
+
+/* =====================================================================
+   2) EINGABEFELDER (Definition, Standardwerte)
+   Standardwerte sind neutrale Beispielwerte. Eigene Werte gehören in
+   local.env (Schlüssel = "env" des Feldes, sonst die Feld-ID).
+   ===================================================================== */
+
+const FIELDS = [
+  // Immobilienkredit
+  { id: "kredit",              env: "LOAN_AMOUNT",               grp: "kredit",    label: "Darlehensbetrag",               def: 300000, unit: "€",      kind: "money", min: 0 },
+  { id: "zins",                env: "INTEREST_RATE",             grp: "kredit",    label: "Sollzins",                      def: 4,      unit: "% p.a.", kind: "pct",   min: 0 },
+  { id: "tilgung",             env: "INITIAL_REPAYMENT",         grp: "kredit",    label: "Anfängliche Tilgung",           def: 2,      unit: "% p.a.", kind: "pct",   min: 0 },
+  { id: "zinsbindungJahre",    env: "FIXED_TERM_YEARS",          grp: "kredit",    label: "Zinsbindung",                   def: 10,     unit: "Jahre",  kind: "int",   min: 1, max: 40 },
+  // Sondertilgung
+  { id: "sondertilgungPct",    env: "MAX_SPECIAL_REPAYMENT_PCT", grp: "sonder",    label: "Max. Sondertilgung pro Jahr",   def: 5,      unit: "% d. Kredits", kind: "pct", min: 0, max: 100 },
+  { id: "anteilSondertilgung",                                   grp: "sonder",    label: "Szenario C: Anteil Sondertilgung", def: 50,  unit: "%",      kind: "pct",   min: 0, max: 100, range: [0, 100, 5] },
+  // ETF
+  { id: "etfRendite",          env: "ETF_RETURN",                grp: "etf",       label: "Erwartete Rendite",             def: 6,      unit: "% p.a.", kind: "pct" },
+  { id: "steuersatz",          env: "TAX_RATE",                  grp: "etf",       label: "Abgeltungsteuer inkl. Soli",    def: 26.375, unit: "%",      kind: "pct",   min: 0, max: 100 },
+  { id: "teilfreistellung",    env: "PARTIAL_EXEMPTION",         grp: "etf",       label: "Teilfreistellung",              def: 30,     unit: "%",      kind: "pct",   min: 0, max: 100 },
+  // Anschlussfinanzierung & Horizont
+  { id: "anschlusszins",       env: "FOLLOWUP_RATE",             grp: "anschluss", label: "Anschlusszins",                 def: 4,      unit: "% p.a.", kind: "pct",   min: 0 },
+  { id: "horizontJahre",                                         grp: "anschluss", label: "Horizont ab heute",             def: 20,     unit: "Jahre",  kind: "int",   min: 10, max: 30, range: [10, 30, 1] },
+];
+const CHECKS = [
+  { id: "nachZinsbindungWeiter", def: true },
+];
+
+/**
+ * Überschreibt die Standardwerte aus einer optionalen Datei "local.env"
+ * (Zeilen "SCHLUESSEL=wert", "#" für Kommentare). Fehlt die Datei – z. B. auf
+ * GitHub Pages oder bei file:// –, bleiben die Werte oben bestehen.
+ */
+async function loadLocalEnv() {
+  let text;
+  try {
+    const res = await fetch("local.env", { cache: "no-store" });
+    if (!res.ok) return;
+    text = await res.text();
+  } catch { return; }
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\s*([\w]+)\s*=\s*(.*?)\s*$/);
+    if (!m) continue;
+    const [, key, raw] = m;
+    const f = FIELDS.find(x => (x.env || x.id) === key);
+    if (f) { const v = parseDe(raw, raw.includes(",") ? f.kind : "pct"); if (isFinite(v)) f.def = v; continue; }
+    const c = CHECKS.find(x => x.id === key);
+    if (c && /^(true|false)$/i.test(raw)) c.def = raw.toLowerCase() === "true";
+  }
+}
+
+/* =====================================================================
+   3) UI: Formular aufbauen, lesen
+   ===================================================================== */
+
+const $ = id => document.getElementById(id);
+
+function formatForInput(v, kind) {
+  if (!isFinite(v)) return "";
+  if (kind === "int") return String(Math.round(v));
+  if (kind === "money") return fmtNum(v, 2);
+  return fmtNum(v, 3);
+}
+
+function buildForm() {
+  for (const f of FIELDS) {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `<div class="field"><label for="${f.id}">${f.label}</label>
+      <div class="inp"><input type="text" id="${f.id}" inputmode="${f.kind === "int" ? "numeric" : "decimal"}" autocomplete="off"><span class="unit">${f.unit}</span></div></div>` +
+      (f.range ? `<input type="range" id="${f.id}Range" min="${f.range[0]}" max="${f.range[1]}" step="${f.range[2]}" aria-label="${f.label} Schieberegler">
+      <div class="hint range-hint"><span>${f.range[0]} ${f.unit}</span><span>${f.range[1]} ${f.unit}</span></div>` : "");
+    $("grp-" + f.grp).appendChild(wrap);
+    const el = $(f.id);
+    el.value = formatForInput(f.def, f.kind);
+    el.addEventListener("input", () => { syncRange(f); recalc(); });
+    el.addEventListener("blur", () => {
+      const v = parseDe(el.value, f.kind);
+      if (isFinite(v)) el.value = formatForInput(v, f.kind);
+    });
+    if (f.range) {
+      $(f.id + "Range").addEventListener("input", e => {
+        el.value = formatForInput(Number(e.target.value), f.kind);
+        recalc();
+      });
+      syncRange(f);
+    }
+  }
+  for (const c of CHECKS) {
+    $(c.id).checked = c.def;
+    $(c.id).addEventListener("change", recalc);
+  }
+}
+
+function syncRange(f) {
+  if (!f.range) return;
+  const v = parseDe($(f.id).value, f.kind);
+  if (isFinite(v)) $(f.id + "Range").value = Math.min(f.range[1], Math.max(f.range[0], v));
+}
+
+/** Liest alle Felder; gibt null zurück, wenn ein Feld ungültig ist. */
+function readInputs() {
+  const inp = {};
+  let ok = true;
+  for (const f of FIELDS) {
+    const el = $(f.id);
+    let v = parseDe(el.value, f.kind);
+    const bad = !isFinite(v) || (f.min !== undefined && v < f.min) || (f.max !== undefined && v > f.max);
+    el.parentElement.classList.toggle("invalid", bad);
+    if (bad) ok = false;
+    if (f.kind === "int") v = Math.round(v);
+    inp[f.id] = v;
+  }
+  for (const c of CHECKS) inp[c.id] = $(c.id).checked;
+  return ok ? inp : null;
+}
+
+/* =====================================================================
+   4) UI: Ausgabe
+   ===================================================================== */
+
+let lastResult = null;
+
+const SC = [
+  { key: "a", name: "A: Sondertilgung", color: "var(--sonder)", token: "--sonder" },
+  { key: "b", name: "B: ETF",           color: "var(--etf)",    token: "--etf" },
+  { key: "c", name: "C: Mischung",      color: "var(--mix)",    token: "--mix" },
+];
+const scName = (s, r) => s.key === "c" ? `${s.name} (${fmtNum(r.p.anteilSondertilgung, 1)} % ST)` : s.name;
+
+function winnerText(vorteilEtf) {
+  if (Math.abs(vorteilEtf) < 0.5) return { name: "Gleichstand", color: "var(--neutral)" };
+  return vorteilEtf > 0 ? { name: "ETF", color: "var(--etf)" } : { name: "Sondertilgung", color: "var(--sonder)" };
+}
+
+function breakEvenText(be) {
+  if (be === null || be === undefined) return { v: "–", s: "kein Wechsel zwischen −20 und 40 %" };
+  return { v: pct(be), s: "darüber ETF besser, darunter Sondertilgung" };
+}
+
+function renderTiles(r) {
+  const w = winnerText(r.differenzNetto);
+  const be = breakEvenText(r.breakEven);
+  const jahre = r.a.monate / 12;
+  const tiles = [
+    { hero: true, k: `Differenz Nettovermögen nach ${fmtNum(jahre, 0)} Jahren (B − A)`,
+      v: `<span class="dot" style="background:${w.color}"></span>${w.name} +${eur(Math.abs(r.differenzNetto))}`,
+      s: `Nettovermögen A ${eur(r.a.nettovermoegen)} · B ${eur(r.b.nettovermoegen)} · C ${eur(r.c.nettovermoegen)}` },
+    { k: "Break-even-ETF-Rendite", v: be.v, s: be.s },
+    { k: "Gesparte Zinsen durch Sondertilgung", v: eur(r.gesparteZinsen), s: `A gegenüber B über ${fmtNum(jahre, 0)} Jahre` },
+    { k: "Restschuld Ende Zinsbindung (A)", v: eur(r.a.schuldBindung), s: `B ${eur(r.b.schuldBindung)} · C ${eur(r.c.schuldBindung)}` },
+    { k: "Monatsrate", v: eur2(r.a.rate), s: `Jahresbetrag ${eur(r.a.budget)}` },
+    { k: "Nettovermögen C (Mischung)", v: eur(r.c.nettovermoegen), s: `${fmtNum(r.p.anteilSondertilgung, 1)} % Sondertilgung, Rest ETF` },
+  ];
+  $("tiles").innerHTML = tiles.map(t => `<div class="tile${t.hero ? " hero" : ""}"><div class="k">${t.k}</div><div class="v">${t.v}</div><div class="s">${t.s}</div></div>`).join("");
+
+  $("stickyResult").innerHTML = `<span><span class="dot" style="background:${w.color}"></span><b>${w.name} +${eur(Math.abs(r.differenzNetto))}</b></span>
+    <span>Break-even ${be.v}</span><span>Mischung ${eur(r.c.nettovermoegen)}</span>`;
+}
+
+function renderScenarioTable(r) {
+  const rows = [
+    ["Restschuld Ende Zinsbindung", s => eur(s.schuldBindung)],
+    ["Restschuld am Horizont", s => eur(s.schuldEnde)],
+    ["Schuldenfrei nach", s => s.tilgungsfreiMonat ? monthsText(s.tilgungsfreiMonat) : "–"],
+    ["Zinsen gesamt", s => eur(s.zinsen)],
+    ["Sondertilgungen gesamt", s => eur(s.sondertilgung)],
+    ["ETF eingezahlt", s => eur(s.etfEingezahlt)],
+    ["ETF brutto", s => eur(s.etfBrutto)],
+    ["Steuer bei Verkauf", s => eur(s.steuer)],
+    ["Nettovermögen", s => `<b>${eur(s.nettovermoegen)}</b>`],
+  ];
+  $("scTable").innerHTML = `<thead><tr><th></th>${SC.map(s => `<th><span class="dot" style="background:${s.color}"></span>${scName(s, r)}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map(([k, f]) => `<tr><td>${k}</td>${SC.map(s => `<td>${f(r[s.key])}</td>`).join("")}</tr>`).join("") + "</tbody>";
+  $("scHint").textContent = `Zinsbindung ${r.p.zinsbindungJahre} Jahre zu ${pct(r.p.zins)}, danach ${pct(r.p.anschlusszins)} bei gleicher Rate. Horizont ${fmtNum(r.a.monate / 12, 0)} Jahre.`;
+}
+
+function renderWarnings(r) {
+  const w = [];
+  if (r.a.budget === 0) w.push("Ohne Sondertilgungsbetrag sind alle Szenarien gleich.");
+  if (SC.some(s => r[s.key].negativeTilgung)) w.push("Die Rate deckt nach der Zinsbindung nicht die Zinsen – die Restschuld wächst.");
+  if (r.p.horizontJahre < r.p.zinsbindungJahre) w.push("Horizont ist kürzer als die Zinsbindung – gerechnet wird bis zum Ende der Zinsbindung.");
+  $("stWarn").innerHTML = w.join("<br>");
+}
+
+/* ---------- Charts ---------- */
+let chart1 = null, chart2 = null;
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+function baseChartOptions(xTitle) {
+  const grid = css("--border"), text = css("--text-2");
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        filter: it => !it.dataset.marker,
+        callbacks: {
+          title: items => `Monat ${Math.round(items[0].parsed.x * 12)}`,
+          label: it => ` ${it.dataset.label}: ${eur(it.parsed.y)}`,
+        },
+      },
+    },
+    elements: { point: { radius: 0, hoverRadius: 5, hitRadius: 8 }, line: { borderWidth: 2, tension: 0 } },
+    scales: {
+      x: { type: "linear", title: { display: true, text: xTitle, color: text }, grid: { color: grid, drawTicks: false }, ticks: { color: text, stepSize: 1, callback: v => fmtNum(v, 1) } },
+      y: { grid: { color: grid }, border: { display: false }, ticks: { color: text, callback: v => fmtNum(v / 1000, 0) + " T€" } },
+    },
+  };
+}
+
+function lineDs(label, data, color, dashed) {
+  return { label, data, borderColor: color, backgroundColor: color, borderDash: dashed ? [5, 4] : [], pointHoverBorderColor: css("--surface"), pointHoverBorderWidth: 2 };
+}
+
+/** Senkrechte gestrichelte Linie am Ende der Zinsbindung. */
+function markerDs(x, paths) {
+  const all = paths.flat();
+  const ds = lineDs("Ende Zinsbindung", [{ x, y: Math.min(0, ...all) }, { x, y: Math.max(...all) }], css("--neutral"), true);
+  ds.marker = true;
+  ds.borderWidth = 1;
+  ds.pointHitRadius = 0;
+  return ds;
+}
+
+function renderLegend(id, r) {
+  $(id).innerHTML = SC.map(s => `<span><i class="sw" style="background:${s.color}"></i>${scName(s, r)}</span>`).join("") +
+    `<span><i class="sw" style="background:var(--neutral)"></i>gestrichelt: Ende Zinsbindung</span>`;
+}
+
+function renderCharts(r) {
+  renderLegend("legend1", r);
+  renderLegend("legend2", r);
+  if (typeof Chart === "undefined") return;
+  const toPts = arr => arr.map((y, m) => ({ x: m / 12, y }));
+  const bindung = r.p.zinsbindungJahre;
+
+  const charts = [
+    { canvas: "chart1", path: "schuldPath" },
+    { canvas: "chart2", path: "nettoPath" },
+  ].map(({ canvas, path }) => {
+    const ds = SC.map(s => lineDs(scName(s, r), toPts(r[s.key][path]), css(s.token)));
+    ds.push(markerDs(bindung, SC.map(s => r[s.key][path])));
+    return { canvas, ds };
+  });
+
+  if (!chart1) chart1 = new Chart($("chart1"), { type: "line", data: { datasets: charts[0].ds }, options: baseChartOptions("Jahre ab heute") });
+  else { chart1.data.datasets = charts[0].ds; chart1.options = baseChartOptions("Jahre ab heute"); chart1.update(); }
+  if (!chart2) chart2 = new Chart($("chart2"), { type: "line", data: { datasets: charts[1].ds }, options: baseChartOptions("Jahre ab heute") });
+  else { chart2.data.datasets = charts[1].ds; chart2.options = baseChartOptions("Jahre ab heute"); chart2.update(); }
+}
+
+/* ---------- Heatmap ---------- */
+function renderHeatmap(inp) {
+  const renditen = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const zinsen = [1, 2, 3, 4, 5, 6, 7, 8];
+  const rows = heatmap(inp, renditen, zinsen);
+  const maxAbs = Math.max(1, ...rows.flatMap(z => z.werte).map(Math.abs));
+  const curR = Math.round(inp.etfRendite), curZ = Math.round(inp.anschlusszins);
+  let html = `<thead><tr><th>Anschlusszins ↓ / Rendite →</th>${renditen.map(rd => `<th>${rd} %</th>`).join("")}<th>Break-even</th></tr></thead><tbody>`;
+  for (const row of rows) {
+    html += `<tr><th>${row.anschlusszins} %</th>`;
+    row.werte.forEach((v, j) => {
+      const alpha = 0.12 + 0.6 * Math.sqrt(Math.abs(v) / maxAbs);
+      const rgb = v >= 0 ? "var(--cell-etf)" : "var(--cell-st)";
+      const who = v >= 0 ? "ETF" : "Sondertilgung";
+      const cls = [];
+      if (renditen[j] === curR && row.anschlusszins === curZ) cls.push("cur");
+      if (j > 0 && Math.sign(v) !== Math.sign(row.werte[j - 1])) cls.push("be");
+      html += `<td class="${cls.join(" ")}" style="background:rgba(${rgb},${alpha.toFixed(2)})" title="${who} besser um ${eur(Math.abs(v))} (Rendite ${renditen[j]} %, Anschlusszins ${row.anschlusszins} %)">${v >= 0 ? "ETF" : "ST"} ${fmtNum(Math.abs(v) / 1000, 0)}&nbsp;T€</td>`;
+    });
+    html += `<td class="be-col">${row.breakEven === null ? "–" : pct(row.breakEven, 1)}</td></tr>`;
+  }
+  $("heatTable").innerHTML = html + "</tbody>";
+  $("heatHint").textContent = `Wert = Differenz Nettovermögen B − A nach ${fmtNum(Math.max(inp.horizontJahre, inp.zinsbindungJahre), 0)} Jahren. Umrandet: aktuelle Eingabe (gerundet).`;
+}
+
+/* =====================================================================
+   5) HAUPTSCHLEIFE
+   ===================================================================== */
+
+let pending = false;
+function recalc() {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => {
+    pending = false;
+    const inp = readInputs();
+    if (!inp) return;
+    const r = runModel(inp);
+    lastResult = r;
+    renderWarnings(r);
+    renderTiles(r);
+    renderScenarioTable(r);
+    renderCharts(r);
+    renderHeatmap(inp);
+  });
+}
+
+loadLocalEnv().then(() => {
+  buildForm();
+  try {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (lastResult) renderCharts(lastResult); });
+  } catch {}
+  recalc();
+});
+</script>
+</body>
+</html>

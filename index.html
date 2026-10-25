@@ -58,6 +58,10 @@ body {
 header.top { padding: 20px 16px 8px; max-width: 1280px; margin: 0 auto; }
 header.top h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
 header.top p { margin: 0; color: var(--text-2); }
+nav.pages { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 10px; font-size: 14px; }
+nav.pages a { color: var(--accent); text-decoration: none; }
+nav.pages a:hover { text-decoration: underline; }
+nav.pages a[aria-current] { color: var(--text); font-weight: 600; }
 
 /* Sticky Kurz-Ergebnis (vor allem fürs Handy) */
 .sticky-result {
@@ -153,6 +157,10 @@ footer.note p { margin: 4px 0; }
 <body>
 
 <header class="top">
+  <nav class="pages" aria-label="Rechner">
+    <a href="index.html" aria-current="page">Bausparer oder ETF</a>
+    <a href="sondertilgung.html">Sondertilgung oder ETF</a>
+  </nav>
   <h1>Bausparer oder ETF bis zur Anschlussfinanzierung?</h1>
   <p>Vergleich bis zum Ende der Zinsbindung und Rate der Anschlussfinanzierung – alle Werte werden live berechnet.</p>
 </header>
@@ -280,7 +288,7 @@ const monthsText = m => {
 /**
  * Wandelt eine deutsche Eingabe in eine Zahl um.
  * kind "money"/"int": Punkte sind Tausendertrenner ("300.000" → 300000).
- * sonst: Komma ist Dezimaltrenner; ein Punkt ohne Komma wird ebenfalls als Dezimaltrenner akzeptiert ("3.5").
+ * sonst: Komma ist Dezimaltrenner; ein Punkt ohne Komma wird ebenfalls als Dezimaltrenner akzeptiert ("4.5").
  */
 function parseDe(str, kind) {
   let s = String(str).trim().replace(/\s|€|%|‰/g, "");
