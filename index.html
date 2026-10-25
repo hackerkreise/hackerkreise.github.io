@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bausparer oder ETF</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f1;
+  --surface: #fcfcfb;
+  --surface-2: #efeee9;
+  --border: #dddcd5;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --text-3: #7a7974;
+  --accent: #2a78d6;
+  --bauspar: #2a78d6;
+  --etf: #1baf7a;
+  --neutral: #8a8984;
+  --warn-bg: #fff4dc;
+  --warn-text: #7a5200;
+  --bad: #c43c3b;
+  --cell-etf: 27, 175, 122;
+  --cell-bs: 42, 120, 214;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #121211;
+    --surface: #1a1a19;
+    --surface-2: #242422;
+    --border: #34332f;
+    --text: #f0efec;
+    --text-2: #c3c2b7;
+    --text-3: #918f86;
+    --accent: #3987e5;
+    --bauspar: #3987e5;
+    --etf: #199e70;
+    --neutral: #8a8984;
+    --warn-bg: #3a2c0c;
+    --warn-text: #f3cf86;
+    --bad: #e66767;
+    --cell-etf: 25, 158, 112;
+    --cell-bs: 57, 135, 229;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+header.top { padding: 20px 16px 8px; max-width: 1280px; margin: 0 auto; }
+header.top h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+header.top p { margin: 0; color: var(--text-2); }
+
+/* Sticky Kurz-Ergebnis (vor allem fürs Handy) */
+.sticky-result {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px; font-size: 14px;
+}
+.sticky-result .inner { max-width: 1280px; margin: 0 auto; display: flex; gap: 6px 16px; flex-wrap: wrap; align-items: baseline; }
+.sticky-result b { font-size: 15px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+
+main.layout { max-width: 1280px; margin: 0 auto; padding: 12px 16px 40px; display: grid; gap: 16px; }
+@media (min-width: 980px) {
+  main.layout { grid-template-columns: 380px minmax(0, 1fr); align-items: start; }
+  .inputs-col { position: sticky; top: 56px; max-height: calc(100vh - 64px); overflow-y: auto; padding-right: 4px; }
+}
+.inputs-col, .results-col { display: grid; gap: 16px; min-width: 0; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.card h2 { font-size: 16px; margin: 0 0 10px; }
+.card h3 { font-size: 14px; margin: 14px 0 6px; color: var(--text-2); }
+details.card > summary { cursor: pointer; font-weight: 600; font-size: 16px; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::after { content: "▾"; color: var(--text-3); transition: transform .15s; }
+details.card:not([open]) > summary::after { transform: rotate(-90deg); }
+details.card[open] > summary { margin-bottom: 10px; }
+
+.field { display: grid; grid-template-columns: 1fr 140px; gap: 8px; align-items: center; padding: 5px 0; }
+.field label { color: var(--text-2); font-size: 14px; }
+.inp { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.inp:focus-within { outline: 2px solid var(--accent); outline-offset: -1px; }
+.inp input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 16px; padding: 8px 6px 8px 10px; text-align: right; font-variant-numeric: tabular-nums; }
+.inp input:focus { outline: none; }
+.inp input[readonly] { color: var(--text-2); }
+.inp .unit { padding: 0 10px 0 2px; color: var(--text-3); font-size: 14px; white-space: nowrap; }
+.inp.invalid { border-color: var(--bad); }
+.check { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; color: var(--text-2); font-size: 14px; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); flex: none; }
+input[type=range] { width: 100%; accent-color: var(--accent); height: 28px; }
+.hint { font-size: 13px; color: var(--text-3); margin: 4px 0 0; }
+.warn { background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-top: 8px; }
+.warn:empty { display: none; }
+
+/* Kennzahlen */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.tile .k { font-size: 13px; color: var(--text-2); }
+.tile .v { font-size: 20px; font-weight: 650; margin-top: 2px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.tile .s { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.tile.hero { grid-column: 1 / -1; }
+.tile.hero .v { font-size: 28px; }
+@media (min-width: 640px) { .tile.hero { grid-column: span 2; } }
+
+/* Tabellen */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 8px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { color: var(--text-2); font-weight: 600; font-size: 13px; }
+td.wrap { white-space: normal; min-width: 160px; color: var(--text-2); font-size: 13px; }
+.sens td, .sens th { text-align: center; font-size: 12.5px; padding: 6px 5px; }
+.sens td { border: 2px solid var(--surface); border-radius: 4px; color: var(--text); }
+.sens th:first-child, .sens td:first-child { text-align: left; }
+.sens td.cur { outline: 2px solid var(--text); outline-offset: -2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text-2); margin: 4px 0 10px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+.chart-box { position: relative; height: 280px; }
+@media (min-width: 640px) { .chart-box { height: 320px; } }
+
+/* Szenarien */
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row .inp { flex: 1 1 180px; }
+.row .inp input { text-align: left; }
+button { font: inherit; font-size: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); padding: 8px 12px; cursor: pointer; min-height: 38px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button:hover { filter: brightness(0.97); }
+.sc-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.sc-list li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+.sc-list .name { flex: 1 1 140px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.sc-list .meta { font-size: 12px; color: var(--text-3); font-weight: 400; display: block; }
+.sc-list label.cmp { font-size: 13px; color: var(--text-2); display: flex; gap: 6px; align-items: center; }
+.sc-list button { padding: 4px 10px; min-height: 32px; }
+.muted { color: var(--text-3); font-size: 13px; }
+
+footer.note { max-width: 1280px; margin: 0 auto; padding: 0 16px 32px; color: var(--text-3); font-size: 13px; }
+footer.note p { margin: 4px 0; }
+.pos { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>Bausparer oder ETF bis zur Anschlussfinanzierung?</h1>
+  <p>Vergleich bis zum Ende der Zinsbindung und Rate der Anschlussfinanzierung – alle Werte werden live berechnet.</p>
+</header>
+
+<div class="sticky-result" aria-live="polite">
+  <div class="inner" id="stickyResult">–</div>
+</div>
+
+<main class="layout">
+  <!-- ===================== EINGABEN ===================== -->
+  <div class="inputs-col">
+    <details class="card" open>
+      <summary>Immobilienkredit</summary>
+      <div id="grp-kredit"></div>
+    </details>
+
+    <details class="card" open>
+      <summary>Bausparvertrag</summary>
+      <div id="grp-bauspar"></div>
+      <label class="check"><input type="checkbox" id="sparrateAuto" checked>
+        <span>Sparrate automatisch berechnen (Zuteilungsquote genau zum Ende der Zinsbindung)</span></label>
+      <div id="grp-sparrate"></div>
+      <div class="warn" id="bsWarn"></div>
+    </details>
+
+    <details class="card" open>
+      <summary>ETF</summary>
+      <div id="grp-etf"></div>
+      <label class="check"><input type="checkbox" id="pauschAktiv" checked><span>Sparerpauschbetrag berücksichtigen</span></label>
+      <label class="check"><input type="checkbox" id="feesInEtf" checked><span>Gebühren des Bausparers ebenfalls in den ETF anlegen (fairer Vergleich)</span></label>
+      <h3>Stresstest</h3>
+      <div id="grp-stress"></div>
+    </details>
+
+    <details class="card" open>
+      <summary>Anschlussfinanzierung</summary>
+      <div id="grp-anschluss"></div>
+      <input type="range" id="anschlusszinsRange" min="1" max="12" step="0.05" aria-label="Anschlusszins Schieberegler">
+      <div class="hint" style="display:flex;justify-content:space-between"><span>1 %</span><span>12 %</span></div>
+    </details>
+
+    <section class="card">
+      <h2>Szenarien</h2>
+      <div class="row">
+        <div class="inp"><input type="text" id="scName" placeholder="Name des Szenarios" aria-label="Name des Szenarios"></div>
+        <button class="primary" id="scSave">Szenario speichern</button>
+      </div>
+      <div class="warn" id="scWarn"></div>
+      <ul class="sc-list" id="scList"></ul>
+      <p class="hint">Bis zu 3 Szenarien zum Vergleich anhaken.</p>
+    </section>
+  </div>
+
+  <!-- ===================== ERGEBNISSE ===================== -->
+  <div class="results-col">
+    <section>
+      <div class="tiles" id="tiles"></div>
+    </section>
+
+    <section class="card">
+      <h2>Monatliche Raten nach Anschluss</h2>
+      <div class="table-wrap"><table id="rateTable"></table></div>
+      <p class="hint" id="rateHint"></p>
+    </section>
+
+    <section class="card">
+      <h2>Bausparguthaben vs. ETF-Depot während der Zinsbindung</h2>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--bauspar)"></i>Bausparguthaben</span>
+        <span><i class="sw" style="background:var(--etf)"></i>ETF-Depot (brutto)</span>
+        <span><i class="sw" style="background:var(--neutral)"></i>Eingezahlt (ETF)</span>
+      </div>
+      <div class="chart-box"><canvas id="chart1" aria-label="Verlauf Bausparguthaben und ETF-Depot"></canvas></div>
+    </section>
+
+    <section class="card">
+      <h2>Restschuld nach Anschluss (gleiche Monatsbelastung)</h2>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--bauspar)"></i>Bausparer-Szenario (Markt- + Bauspardarlehen)</span>
+        <span><i class="sw" style="background:var(--etf)"></i>ETF-Szenario</span>
+      </div>
+      <div class="chart-box"><canvas id="chart2" aria-label="Restschuld beider Szenarien nach Anschluss"></canvas></div>
+    </section>
+
+    <section class="card">
+      <h2>Sensitivität: Vorteil je ETF-Rendite und Anschlusszins</h2>
+      <div class="legend">
+        <span><i class="sw" style="background:rgb(var(--cell-etf))"></i>ETF besser</span>
+        <span><i class="sw" style="background:rgb(var(--cell-bs))"></i>Bausparer besser</span>
+        <span>Wert = Vorteil des besseren Szenarios bei Bauspar-Rückzahlung. Umrandet: aktuelle Eingabe (gerundet).</span>
+      </div>
+      <div class="table-wrap"><table class="sens" id="sensTable"></table></div>
+    </section>
+
+    <section class="card" id="cmpCard">
+      <h2>Szenario-Vergleich</h2>
+      <div class="table-wrap" id="cmpWrap"><p class="muted">Noch keine Szenarien zum Vergleich ausgewählt.</p></div>
+    </section>
+  </div>
+</main>
+
+<footer class="note">
+  <p><b>Hinweis:</b> Modellrechnung, keine Finanzberatung. Die Steuer ist vereinfacht berechnet (Abgeltungsteuer inkl. Soli auf den Gewinn nach Teilfreistellung, Sparerpauschbetrag einmalig im Verkaufsjahr; keine Vorabpauschale, keine Kirchensteuer). ETF-Renditen schwanken; die angenommene Rendite ist nicht garantiert.</p>
+  <p>Die Zuteilung des Bausparvertrags kann zusätzlich von Bewertungszahl und Mindestlaufzeit abhängen. Guthabenzins wird vereinfacht monatlich gutgeschrieben, die Jahresgebühr jeweils zu Beginn eines Vertragsjahres abgezogen.</p>
+</footer>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   1) FORMATIERUNG & PARSING (deutsches Zahlenformat)
+   ===================================================================== */
+
+const fmtEUR = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const fmtEUR2 = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtNum = (v, maxDec = 2) => new Intl.NumberFormat("de-DE", { maximumFractionDigits: maxDec }).format(v);
+const eur = v => fmtEUR.format(Math.round(v));
+const eur2 = v => fmtEUR2.format(v);
+const pct = (v, d = 2) => new Intl.NumberFormat("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d }).format(v) + " %";
+const monthsText = m => {
+  const y = Math.floor(m / 12), r = m % 12;
+  return `${m} Monate (${y} J.${r ? " " + r + " M." : ""})`;
+};
+
+/**
+ * Wandelt eine deutsche Eingabe in eine Zahl um.
+ * kind "money"/"int": Punkte sind Tausendertrenner ("300.000" → 300000).
+ * sonst: Komma ist Dezimaltrenner; ein Punkt ohne Komma wird ebenfalls als Dezimaltrenner akzeptiert ("3.5").
+ */
+function parseDe(str, kind) {
+  let s = String(str).trim().replace(/\s|€|%|‰/g, "");
+  if (s === "") return NaN;
+  if (kind === "money" || kind === "int" || s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  if (!/^-?\d*\.?\d+$/.test(s)) return NaN;
+  return Number(s);
+}
+
+/* =====================================================================
+   2) EINGABEFELDER (Definition, Standardwerte)
+   ===================================================================== */
+
+const FIELDS = [
+  // Immobilienkredit
+  { id: "betrag",        grp: "kredit",   label: "Darlehensbetrag",              def: 300000, unit: "€",       kind: "money", min: 0 },
+  { id: "sollzins",      grp: "kredit",   label: "Sollzins",                     def: 3.8,    unit: "% p.a.",  kind: "pct",   min: 0 },
+  { id: "tilgung",       grp: "kredit",   label: "Anfängliche Tilgung",          def: 2,      unit: "% p.a.",  kind: "pct",   min: 0 },
+  { id: "tilgungsfrei",  grp: "kredit",   label: "Tilgungsfreie Monate zu Beginn", def: 0,    unit: "Mon.",    kind: "int",   min: 0 },
+  { id: "monate",        grp: "kredit",   label: "Restlaufzeit Zinsbindung",     def: 120,    unit: "Mon.",    kind: "int",   min: 1, max: 600 },
+  // Bausparvertrag
+  { id: "bsSumme",       grp: "bauspar",  label: "Bausparsumme",                 def: 100000, unit: "€",       kind: "money", min: 0 },
+  { id: "bsGuthabenzins",grp: "bauspar",  label: "Guthabenzins",                 def: 0.1,    unit: "% p.a.",  kind: "pct",   min: 0 },
+  { id: "bsDarlehenszins",grp:"bauspar",  label: "Darlehenszins (Sollzins)",     def: 2,      unit: "% p.a.",  kind: "pct",   min: 0 },
+  { id: "bsQuote",       grp: "bauspar",  label: "Zuteilungsquote (Mindestguthaben)", def: 40, unit: "%",      kind: "pct",   min: 0, max: 100 },
+  { id: "bsAbschluss",   grp: "bauspar",  label: "Abschlussgebühr (einmalig)",   def: 1,      unit: "% d. BSS", kind: "pct",  min: 0 },
+  { id: "bsJahresgebuehr",grp:"bauspar",  label: "Jahresgebühr",                 def: 12,     unit: "€",       kind: "money", min: 0 },
+  { id: "bsRatePromille",grp: "bauspar",  label: "Rate Bauspardarlehen (Zins + Tilgung) mtl.", def: 5, unit: "‰ d. BSS", kind: "pct", min: 0 },
+  { id: "sparrate",      grp: "sparrate", label: "Monatliche Sparrate",          def: 0,      unit: "€",       kind: "money", min: 0 },
+  // ETF
+  { id: "etfRendite",    grp: "etf",      label: "Erwartete Rendite",            def: 6,      unit: "% p.a.",  kind: "pct" },
+  { id: "steuersatz",    grp: "etf",      label: "Abgeltungsteuer inkl. Soli",   def: 26.375, unit: "%",       kind: "pct",   min: 0, max: 100 },
+  { id: "teilfrei",      grp: "etf",      label: "Teilfreistellung",             def: 30,     unit: "%",       kind: "pct",   min: 0, max: 100 },
+  { id: "pausch",        grp: "etf",      label: "Sparerpauschbetrag pro Jahr",  def: 1000,   unit: "€",       kind: "money", min: 0 },
+  { id: "crash",         grp: "stress",   label: "ETF-Crash kurz vor Anschluss", def: 0,      unit: "%",       kind: "pct",   min: 0, max: 100 },
+  // Anschlussfinanzierung
+  { id: "anschlusszins", grp: "anschluss",label: "Anschlusszins",                def: 4,      unit: "% p.a.",  kind: "pct",   min: 0 },
+  { id: "anschlussTilgung",grp:"anschluss",label: "Tilgung Anschlussfinanzierung", def: 2,    unit: "% p.a.",  kind: "pct",   min: 0 },
+];
+const CHECKS = [
+  { id: "sparrateAuto", def: true },
+  { id: "pauschAktiv",  def: true },
+  { id: "feesInEtf",    def: true },
+];
+
+/**
+ * Überschreibt die Standardwerte aus einer optionalen Datei "local.env"
+ * (Zeilen "feldId=wert", "#" für Kommentare). Fehlt die Datei – z. B. auf
+ * GitHub Pages oder bei file:// –, bleiben die Werte oben bestehen.
+ */
+async function loadLocalEnv() {
+  let text;
+  try {
+    const res = await fetch("local.env", { cache: "no-store" });
+    if (!res.ok) return;
+    text = await res.text();
+  } catch { return; }
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\s*([\w]+)\s*=\s*(.*?)\s*$/);
+    if (!m) continue;
+    const [, key, raw] = m;
+    const f = FIELDS.find(x => x.id === key);
+    if (f) { const v = parseDe(raw, raw.includes(",") ? f.kind : "pct"); if (isFinite(v)) f.def = v; continue; }
+    const c = CHECKS.find(x => x.id === key);
+    if (c && /^(true|false)$/i.test(raw)) c.def = raw.toLowerCase() === "true";
+  }
+}
+
+/* =====================================================================
+   3) RECHENLOGIK – reine Funktionen ohne DOM-Zugriff
+   Alle Zinsen werden monatlich verrechnet (nominaler Jahreszins / 12),
+   außer der ETF-Rendite: monatlich (1 + r)^(1/12) − 1.
+   ===================================================================== */
+
+/**
+ * Immobilienkredit bis zum Ende der Zinsbindung.
+ * Rate = Betrag × (Sollzins + Tilgung) / 12. In den tilgungsfreien Monaten
+ * werden nur Zinsen gezahlt. Liefert Restschuld und Verlauf.
+ */
+function calcLoan(inp) {
+  const i = inp.sollzins / 100 / 12;
+  const rate = inp.betrag * (inp.sollzins + inp.tilgung) / 100 / 12;
+  let s = inp.betrag, zinsen = 0;
+  const path = [s];
+  for (let m = 1; m <= inp.monate; m++) {
+    const z = s * i;
+    const pay = m <= inp.tilgungsfrei ? z : Math.min(rate, s + z);
+    zinsen += z;
+    s = s + z - pay;
+    path.push(s);
+  }
+  return { rate, rateTilgungsfrei: inp.betrag * i, restschuld: s, zinsen, path };
+}
+
+/**
+ * Gebühren des Bausparvertrags je Monat (Index 0 … monate−1):
+ * Abschlussgebühr im ersten Monat, Jahresgebühr zu Beginn jedes Vertragsjahres.
+ */
+function bausparFees(inp) {
+  const fees = new Array(inp.monate).fill(0);
+  for (let m = 0; m < inp.monate; m++) {
+    if (m === 0) fees[m] += inp.bsSumme * inp.bsAbschluss / 100;
+    if (m % 12 === 0) fees[m] += inp.bsJahresgebuehr;
+  }
+  return fees;
+}
+
+/**
+ * Ansparphase Bausparvertrag: pro Monat Gebühr abziehen, Sparrate einzahlen,
+ * Guthabenzins (monatlich, nur auf positives Guthaben) gutschreiben.
+ */
+function calcBauspar(inp, sparrate) {
+  const r = inp.bsGuthabenzins / 100 / 12;
+  const fees = bausparFees(inp);
+  let g = 0;
+  const path = [0];
+  for (let m = 0; m < inp.monate; m++) {
+    g += sparrate - fees[m];
+    if (g > 0) g += g * r;
+    path.push(g);
+  }
+  const feesTotal = fees.reduce((a, b) => a + b, 0);
+  return { guthaben: g, path, fees, feesTotal, eingezahlt: sparrate * inp.monate };
+}
+
+/**
+ * Sparrate, mit der das Mindestguthaben (Quote × Bausparsumme) genau zum
+ * Ende der Zinsbindung erreicht wird – per Bisektion (Guthaben steigt monoton
+ * mit der Sparrate). Auf volle Cent aufgerundet.
+ */
+function autoSparrate(inp) {
+  const target = inp.bsSumme * inp.bsQuote / 100;
+  if (target <= 0) return 0;
+  let lo = 0, hi = target + inp.bsSumme + 1000;
+  for (let k = 0; k < 80; k++) {
+    const mid = (lo + hi) / 2;
+    if (calcBauspar(inp, mid).guthaben < target) lo = mid; else hi = mid;
+  }
+  return Math.ceil(hi * 100) / 100;
+}
+
+/**
+ * ETF-Sparplan: gleiche Sparrate (plus ggf. die Bauspar-Gebühren des Monats),
+ * Einzahlung zu Monatsbeginn, monatliche Rendite (1+r)^(1/12)−1.
+ * Am Ende: optionaler Crash, dann Steuer auf den Gewinn:
+ *   Steuer = max(0, Gewinn × (1 − Teilfreistellung) − Pauschbetrag) × Steuersatz
+ * (Pauschbetrag vereinfacht einmal im Verkaufsjahr.)
+ */
+function calcEtf(inp, sparrate, fees) {
+  const g = Math.pow(1 + inp.etfRendite / 100, 1 / 12) - 1;
+  let v = 0, inv = 0;
+  const path = [0], investedPath = [0];
+  for (let m = 0; m < inp.monate; m++) {
+    const c = sparrate + (inp.feesInEtf ? fees[m] : 0);
+    inv += c;
+    v = (v + c) * (1 + g);
+    path.push(v);
+    investedPath.push(inv);
+  }
+  const bruttoVorCrash = v;
+  const brutto = v * (1 - inp.crash / 100);
+  const gewinn = brutto - inv;
+  const steuerpflichtig = Math.max(0, gewinn * (1 - inp.teilfrei / 100) - (inp.pauschAktiv ? inp.pausch : 0));
+  const steuer = steuerpflichtig * inp.steuersatz / 100;
+  return { bruttoVorCrash, brutto, eingezahlt: inv, gewinn, steuer, netto: brutto - steuer, path, investedPath };
+}
+
+/**
+ * Anschlussfinanzierung beider Szenarien und fairer Vergleich.
+ *
+ * Bausparer: Guthaben + Bauspardarlehen lösen einen Teil der Restschuld ab.
+ *   Bauspardarlehen = Bausparsumme − Guthaben (höchstens so viel wie benötigt),
+ *   Marktdarlehen   = Restschuld − Guthaben − Bauspardarlehen.
+ *   Marktdarlehen: Annuität (Anschlusszins + Tilgung)/12, Bauspardarlehen: feste Rate (‰ der BSS).
+ * ETF: Depot (netto) wird sondergetilgt, Marktdarlehen = Restschuld − ETF netto.
+ *
+ * Fairer Vergleich: Das ETF-Szenario zahlt jeden Monat genau so viel wie das
+ * Bausparer-Szenario (Marktrate + Bausparrate). Simuliert wird, bis das
+ * Bauspardarlehen getilgt ist; dann wird die verbleibende Schuld verglichen.
+ * Ist ein Darlehen vorher getilgt, zählen weitere Zahlungen als angesparter Betrag.
+ *
+ * vorteilEtf > 0 → ETF besser, < 0 → Bausparer besser.
+ */
+function calcAnschluss(inp, restschuld, guthaben, etfNetto, zinsOverride) {
+  const zins = zinsOverride ?? inp.anschlusszins;
+  const iz = zins / 100 / 12;
+  const ib = inp.bsDarlehenszins / 100 / 12;
+  const annuitaet = L => L * (zins + inp.anschlussTilgung) / 100 / 12;
+
+  const bsDarlehen = Math.max(0, Math.min(inp.bsSumme - guthaben, restschuld - guthaben));
+  const marktB = Math.max(0, restschuld - guthaben - bsDarlehen);
+  const marktE = Math.max(0, restschuld - etfNetto);
+  const bsRateSoll = inp.bsSumme * inp.bsRatePromille / 1000;
+
+  const rateOhne = annuitaet(restschuld);
+  const rateMarktB = annuitaet(marktB);
+  const rateEtfEigen = annuitaet(marktE);
+
+  // Monatliche Simulation
+  const MAX = 1200;
+  let mB = marktB, dB = bsDarlehen, e = marktE, cashB = 0, cashE = 0, n = 0;
+  const pathB = [mB + dB], pathE = [e];
+  let zinsenB = 0, zinsenE = 0;
+  while (dB > 0.005 && n < MAX) {
+    n++;
+    // Bausparer-Szenario
+    const zM = mB * iz, zD = dB * ib;
+    const payM = Math.min(rateMarktB, mB + zM);
+    const payD = Math.min(bsRateSoll, dB + zD);
+    cashB += rateMarktB - payM;
+    mB = mB + zM - payM;
+    dB = dB + zD - payD;
+    zinsenB += zM + zD;
+    const belastung = rateMarktB + payD; // was im Bausparer-Szenario diesen Monat bezahlt wird
+    // ETF-Szenario mit gleicher Belastung
+    const zE = e * iz;
+    const payE = Math.min(belastung, e + zE);
+    cashE += belastung - payE;
+    e = e + zE - payE;
+    zinsenE += zE;
+    pathB.push(mB + dB - cashB);
+    pathE.push(e - cashE);
+  }
+  const schuldB = mB + dB - cashB;
+  const schuldE = e - cashE;
+  return {
+    zins, bsDarlehen, marktB, marktE, bsRateSoll,
+    rateOhne, rateMarktB, rateEtfEigen,
+    belastung: rateMarktB + (bsDarlehen > 0 ? bsRateSoll : 0),
+    laufzeitBs: n, nichtGetilgt: dB > 0.005,
+    schuldB, schuldE, vorteilEtf: schuldB - schuldE,
+    zinsenB, zinsenE, pathB, pathE,
+  };
+}
+
+/** Komplettes Modell für einen Eingabesatz. */
+function runModel(inp, opts = {}) {
+  const loan = calcLoan(inp);
+  const sparrate = inp.sparrateAuto ? autoSparrate(inp) : inp.sparrate;
+  const bs = calcBauspar(inp, sparrate);
+  const etf = calcEtf(inp, sparrate, bs.fees);
+  const an = calcAnschluss(inp, loan.restschuld, bs.guthaben, etf.netto);
+  const res = { inp, loan, sparrate, bs, etf, an, mindestguthaben: inp.bsSumme * inp.bsQuote / 100 };
+  if (opts.breakEven !== false) res.breakEven = breakEvenZins(inp, loan.restschuld, bs.guthaben, etf.netto);
+  return res;
+}
+
+/**
+ * Break-even-Anschlusszins: Zins, bei dem beide Szenarien zum Zeitpunkt der
+ * Bauspar-Rückzahlung dieselbe Restschuld haben (vorteilEtf = 0). Bisektion
+ * im Bereich 0–25 %. Gibt null zurück, wenn es dort keinen Vorzeichenwechsel gibt.
+ */
+function breakEvenZins(inp, restschuld, guthaben, etfNetto) {
+  const f = z => calcAnschluss(inp, restschuld, guthaben, etfNetto, z).vorteilEtf;
+  let lo = 0, hi = 25, flo = f(lo), fhi = f(hi);
+  if (flo === 0) return lo;
+  if (Math.sign(flo) === Math.sign(fhi)) return null;
+  for (let k = 0; k < 60; k++) {
+    const mid = (lo + hi) / 2, fm = f(mid);
+    if (Math.sign(fm) === Math.sign(flo)) { lo = mid; flo = fm; } else { hi = mid; }
+  }
+  return { zins: (lo + hi) / 2, etfBesserUnterhalb: f(0) > 0 };
+}
+
+/* =====================================================================
+   4) UI: Formular aufbauen, lesen, schreiben
+   ===================================================================== */
+
+const $ = id => document.getElementById(id);
+
+function formatForInput(v, kind) {
+  if (!isFinite(v)) return "";
+  if (kind === "int") return String(Math.round(v));
+  if (kind === "money") return fmtNum(v, 2);
+  return fmtNum(v, 3);
+}
+
+function buildForm() {
+  for (const f of FIELDS) {
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+    wrap.innerHTML = `<label for="${f.id}">${f.label}</label>
+      <div class="inp"><input type="text" id="${f.id}" inputmode="${f.kind === "int" ? "numeric" : "decimal"}" autocomplete="off"><span class="unit">${f.unit}</span></div>`;
+    $("grp-" + f.grp).appendChild(wrap);
+    const el = wrap.querySelector("input");
+    el.value = formatForInput(f.def, f.kind);
+    el.addEventListener("input", () => { if (f.id === "anschlusszins") syncRange(); recalc(); });
+    el.addEventListener("blur", () => {
+      const v = parseDe(el.value, f.kind);
+      if (isFinite(v)) el.value = formatForInput(v, f.kind);
+    });
+  }
+  for (const c of CHECKS) {
+    $(c.id).checked = c.def;
+    $(c.id).addEventListener("change", () => {
+      if (c.id === "sparrateAuto" && !$(c.id).checked && lastResult) {
+        $("sparrate").value = formatForInput(lastResult.sparrate, "money");
+      }
+      recalc();
+    });
+  }
+  $("anschlusszinsRange").addEventListener("input", e => {
+    $("anschlusszins").value = formatForInput(Number(e.target.value), "pct");
+    recalc();
+  });
+  syncRange();
+}
+
+function syncRange() {
+  const v = parseDe($("anschlusszins").value, "pct");
+  if (isFinite(v)) $("anschlusszinsRange").value = Math.min(12, Math.max(1, v));
+}
+
+/** Liest alle Felder; gibt null zurück, wenn ein Feld ungültig ist. */
+function readInputs() {
+  const inp = {};
+  let ok = true;
+  for (const f of FIELDS) {
+    const el = $(f.id);
+    let v = parseDe(el.value, f.kind);
+    const bad = !isFinite(v) || (f.min !== undefined && v < f.min) || (f.max !== undefined && v > f.max);
+    const skip = f.id === "sparrate" && $("sparrateAuto").checked;
+    el.parentElement.classList.toggle("invalid", bad && !skip);
+    if (bad && !skip) ok = false;
+    if (f.kind === "int") v = Math.round(v);
+    inp[f.id] = v;
+  }
+  for (const c of CHECKS) inp[c.id] = $(c.id).checked;
+  if (ok && inp.tilgungsfrei > inp.monate) { $("tilgungsfrei").parentElement.classList.add("invalid"); ok = false; }
+  return ok ? inp : null;
+}
+
+function writeInputs(inp) {
+  for (const f of FIELDS) if (inp[f.id] !== undefined) $(f.id).value = formatForInput(inp[f.id], f.kind);
+  for (const c of CHECKS) if (inp[c.id] !== undefined) $(c.id).checked = !!inp[c.id];
+  syncRange();
+}
+
+/* =====================================================================
+   5) UI: Ausgabe
+   ===================================================================== */
+
+let lastResult = null;
+
+function winnerText(vorteilEtf) {
+  if (Math.abs(vorteilEtf) < 0.5) return { name: "Gleichstand", color: "var(--neutral)" };
+  return vorteilEtf > 0 ? { name: "ETF", color: "var(--etf)" } : { name: "Bausparer", color: "var(--bauspar)" };
+}
+
+function breakEvenText(be) {
+  if (!be) return { v: "–", s: "kein Wechsel zwischen 0 und 25 %" };
+  return { v: pct(be.zins), s: be.etfBesserUnterhalb ? "darunter ETF besser, darüber Bausparer" : "darunter Bausparer besser, darüber ETF" };
+}
+
+function renderTiles(r) {
+  const w = winnerText(r.an.vorteilEtf);
+  const be = breakEvenText(r.breakEven);
+  const tiles = [
+    { hero: true, k: "Vorteil des besseren Szenarios", v: `<span class="dot" style="background:${w.color}"></span>${w.name} +${eur(Math.abs(r.an.vorteilEtf))}`,
+      s: `geringere Restschuld nach ${monthsText(r.an.laufzeitBs)} (Bauspardarlehen getilgt)` },
+    { k: "Restschuld Ende Zinsbindung", v: eur(r.loan.restschuld), s: `Rate bisher ${eur2(r.loan.rate)}` },
+    { k: "Bausparguthaben", v: eur(r.bs.guthaben), s: `Sparrate ${eur2(r.sparrate)} · Gebühren ${eur(r.bs.feesTotal)}` },
+    { k: "ETF-Wert brutto", v: eur(r.etf.brutto), s: r.inp.crash > 0 ? `vor Crash ${eur(r.etf.bruttoVorCrash)}` : `eingezahlt ${eur(r.etf.eingezahlt)}` },
+    { k: "ETF-Wert netto", v: eur(r.etf.netto), s: `Steuer ${eur(r.etf.steuer)}` },
+    { k: "Bauspardarlehen", v: eur(r.an.bsDarlehen), s: r.an.bsDarlehen > 0 ? `Rate ${eur2(r.an.bsRateSoll)} · ${monthsText(r.an.laufzeitBs)}` : "kein Darlehen nötig" },
+    { k: "Break-even-Anschlusszins", v: be.v, s: be.s },
+  ];
+  $("tiles").innerHTML = tiles.map(t => `<div class="tile${t.hero ? " hero" : ""}"><div class="k">${t.k}</div><div class="v">${t.v}</div><div class="s">${t.s}</div></div>`).join("");
+
+  $("stickyResult").innerHTML = `<span><span class="dot" style="background:${w.color}"></span><b>${w.name} +${eur(Math.abs(r.an.vorteilEtf))}</b></span>
+    <span>Rate Bausparer ${eur(r.an.belastung)}</span><span>Break-even ${be.v}</span>`;
+}
+
+function renderRateTable(r) {
+  const a = r.an;
+  const rows = [
+    ["Ohne Sondertilgung", r.loan.restschuld, a.rateOhne, "Annuität auf die volle Restschuld"],
+    ["Mit ETF (eigene Annuität)", a.marktE, a.rateEtfEigen, `Depot netto ${eur(r.etf.netto)} sondergetilgt`],
+    ["Mit ETF (gleiche Belastung wie Bausparer)", a.marktE, a.belastung, "Basis des fairen Vergleichs"],
+    ["Mit Bausparer – Marktdarlehen", a.marktB, a.rateMarktB, "läuft weiter"],
+    ["Mit Bausparer – Bauspardarlehen", a.bsDarlehen, a.bsDarlehen > 0 ? a.bsRateSoll : 0, a.bsDarlehen > 0 ? `${monthsText(a.laufzeitBs)}${a.nichtGetilgt ? " – Rate deckt Zinsen nicht!" : ""}` : "–"],
+    ["Mit Bausparer – gesamt", a.marktB + a.bsDarlehen, a.belastung, "solange das Bauspardarlehen läuft"],
+    ["Mit Bausparer – nach Ende Bauspardarlehen", a.marktB, a.rateMarktB, `ab Monat ${a.laufzeitBs + 1}`],
+  ];
+  $("rateTable").innerHTML = `<thead><tr><th>Szenario</th><th>Darlehen</th><th>Monatsrate</th><th>Hinweis</th></tr></thead><tbody>` +
+    rows.map(x => `<tr><td>${x[0]}</td><td>${eur(x[1])}</td><td><b>${eur2(x[2])}</b></td><td class="wrap">${x[3]}</td></tr>`).join("") + "</tbody>";
+  $("rateHint").textContent = `Anschlusszins ${pct(a.zins)}, Tilgung ${pct(r.inp.anschlussTilgung)}. Restschuld bei Bauspar-Rückzahlung: Bausparer ${eur(a.schuldB)}, ETF ${eur(a.schuldE)}.`;
+}
+
+function renderWarnings(r) {
+  const w = [];
+  if (r.bs.guthaben + 0.005 < r.mindestguthaben) w.push(`Mindestguthaben ${eur(r.mindestguthaben)} wird nicht erreicht (Guthaben ${eur(r.bs.guthaben)}) – Zuteilung zum Anschluss fraglich.`);
+  if (r.bs.guthaben > r.inp.bsSumme) w.push("Guthaben übersteigt die Bausparsumme.");
+  if (r.loan.restschuld < r.inp.bsSumme) w.push("Restschuld ist kleiner als die Bausparsumme – Bauspardarlehen wird nur anteilig genutzt.");
+  if (r.an.nichtGetilgt) w.push("Die Bausparrate reicht nicht zur Tilgung des Bauspardarlehens.");
+  $("bsWarn").innerHTML = w.join("<br>");
+  $("sparrate").readOnly = r.inp.sparrateAuto;
+  if (r.inp.sparrateAuto) $("sparrate").value = formatForInput(r.sparrate, "money");
+}
+
+/* ---------- Charts ---------- */
+let chart1 = null, chart2 = null;
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+function baseChartOptions(xTitle, tooltipTitle) {
+  const grid = css("--border"), text = css("--text-2");
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: items => tooltipTitle(items[0].parsed.x),
+          label: it => ` ${it.dataset.label}: ${eur(it.parsed.y)}`,
+        },
+      },
+    },
+    elements: { point: { radius: 0, hoverRadius: 5, hitRadius: 8 }, line: { borderWidth: 2, tension: 0 } },
+    scales: {
+      x: { type: "linear", title: { display: true, text: xTitle, color: text }, grid: { color: grid, drawTicks: false }, ticks: { color: text, stepSize: 1, callback: v => fmtNum(v, 1) } },
+      y: { grid: { color: grid }, border: { display: false }, ticks: { color: text, callback: v => fmtNum(v / 1000, 0) + " T€" } },
+    },
+  };
+}
+
+function lineDs(label, data, color, dashed) {
+  return { label, data, borderColor: color, backgroundColor: color, borderDash: dashed ? [5, 4] : [], pointHoverBorderColor: css("--surface"), pointHoverBorderWidth: 2 };
+}
+
+function renderCharts(r) {
+  if (typeof Chart === "undefined") return;
+  const toPts = (arr, div = 12) => arr.map((y, m) => ({ x: m / div, y }));
+  const monthTitle = x => `Monat ${Math.round(x * 12)}`;
+
+  const d1 = [
+    lineDs("Bausparguthaben", toPts(r.bs.path), css("--bauspar")),
+    lineDs("ETF-Depot brutto", toPts(r.etf.path), css("--etf")),
+    lineDs("Eingezahlt (ETF)", toPts(r.etf.investedPath), css("--neutral"), true),
+  ];
+  if (!chart1) chart1 = new Chart($("chart1"), { type: "line", data: { datasets: d1 }, options: baseChartOptions("Jahre ab heute", monthTitle) });
+  else { chart1.data.datasets = d1; chart1.options = baseChartOptions("Jahre ab heute", monthTitle); chart1.update(); }
+
+  const t2 = x => `Monat ${Math.round(x * 12)} nach Anschluss`;
+  const d2 = [
+    lineDs("Bausparer-Szenario", toPts(r.an.pathB), css("--bauspar")),
+    lineDs("ETF-Szenario", toPts(r.an.pathE), css("--etf")),
+  ];
+  if (!chart2) chart2 = new Chart($("chart2"), { type: "line", data: { datasets: d2 }, options: baseChartOptions("Jahre nach Anschluss", t2) });
+  else { chart2.data.datasets = d2; chart2.options = baseChartOptions("Jahre nach Anschluss", t2); chart2.update(); }
+}
+
+/* ---------- Sensitivitätstabelle ---------- */
+function renderSensitivity(inp) {
+  const renditen = [3, 4, 5, 6, 7, 8, 9];
+  const zinsen = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const results = renditen.map(rd => zinsen.map(z => runModel({ ...inp, etfRendite: rd, anschlusszins: z }, { breakEven: false }).an.vorteilEtf));
+  const maxAbs = Math.max(1, ...results.flat().map(Math.abs));
+  const curR = Math.round(inp.etfRendite), curZ = Math.round(inp.anschlusszins);
+  let html = `<thead><tr><th>Rendite ↓ / Zins →</th>${zinsen.map(z => `<th>${z} %</th>`).join("")}</tr></thead><tbody>`;
+  renditen.forEach((rd, i) => {
+    html += `<tr><th>${rd} %</th>`;
+    zinsen.forEach((z, j) => {
+      const v = results[i][j];
+      const alpha = 0.12 + 0.6 * Math.sqrt(Math.abs(v) / maxAbs);
+      const rgb = v >= 0 ? "var(--cell-etf)" : "var(--cell-bs)";
+      const who = v >= 0 ? "ETF" : "Bausparer";
+      const cur = rd === curR && z === curZ ? " cur" : "";
+      html += `<td class="${cur.trim()}" style="background:rgba(${rgb},${alpha.toFixed(2)})" title="${who} besser um ${eur(Math.abs(v))} (Rendite ${rd} %, Zins ${z} %)">${v >= 0 ? "ETF" : "BS"} ${fmtNum(Math.abs(v) / 1000, 1)}&nbsp;T€</td>`;
+    });
+    html += "</tr>";
+  });
+  $("sensTable").innerHTML = html + "</tbody>";
+}
+
+/* =====================================================================
+   6) SZENARIEN (localStorage, immer in try/catch)
+   ===================================================================== */
+
+const LS_KEY = "bausparEtfSzenarien.v1";
+let compareIds = [];
+
+function loadScenarios() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; }
+}
+function storeScenarios(list) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(list)); return true; } catch { return false; }
+}
+
+function saveScenario() {
+  const inp = readInputs();
+  const name = $("scName").value.trim();
+  $("scWarn").textContent = "";
+  if (!inp) { $("scWarn").textContent = "Bitte zuerst ungültige Eingaben korrigieren."; return; }
+  if (!name) { $("scWarn").textContent = "Bitte einen Namen eingeben."; $("scName").focus(); return; }
+  const list = loadScenarios();
+  const existing = list.find(s => s.name === name);
+  if (existing) { existing.inputs = inp; existing.date = Date.now(); }
+  else list.push({ id: String(Date.now()) + Math.random().toString(36).slice(2, 6), name, date: Date.now(), inputs: inp });
+  if (!storeScenarios(list)) { $("scWarn").textContent = "Speichern nicht möglich (Browser-Speicher blockiert)."; return; }
+  $("scName").value = "";
+  renderScenarioList();
+}
+
+function renderScenarioList() {
+  const list = loadScenarios();
+  compareIds = compareIds.filter(id => list.some(s => s.id === id));
+  const ul = $("scList");
+  if (!list.length) { ul.innerHTML = `<li class="muted" style="border:0;padding:0">Noch keine Szenarien gespeichert.</li>`; renderComparison(); return; }
+  ul.innerHTML = list.map(s => `<li>
+      <span class="name">${escapeHtml(s.name)}<span class="meta">${new Date(s.date).toLocaleDateString("de-DE")} · Zins ${pct(s.inputs.anschlusszins)} · Rendite ${pct(s.inputs.etfRendite, 1)}</span></span>
+      <label class="cmp"><input type="checkbox" data-cmp="${s.id}" ${compareIds.includes(s.id) ? "checked" : ""}> Vergleich</label>
+      <button data-load="${s.id}">Laden</button>
+      <button data-del="${s.id}" aria-label="Szenario ${escapeHtml(s.name)} löschen">Löschen</button>
+    </li>`).join("");
+  renderComparison();
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function onScenarioListClick(e) {
+  const t = e.target;
+  const list = loadScenarios();
+  if (t.dataset.load) {
+    const s = list.find(x => x.id === t.dataset.load);
+    if (s) { writeInputs(s.inputs); recalc(); }
+  } else if (t.dataset.del) {
+    const s = list.find(x => x.id === t.dataset.del);
+    if (s && confirm(`Szenario „${s.name}" löschen?`)) {
+      storeScenarios(list.filter(x => x.id !== s.id));
+      renderScenarioList();
+    }
+  } else if (t.dataset.cmp) {
+    if (t.checked) {
+      if (compareIds.length >= 3) { t.checked = false; $("scWarn").textContent = "Maximal 3 Szenarien gleichzeitig vergleichen."; return; }
+      compareIds.push(t.dataset.cmp);
+    } else compareIds = compareIds.filter(id => id !== t.dataset.cmp);
+    $("scWarn").textContent = "";
+    renderComparison();
+  }
+}
+
+function renderComparison() {
+  const list = loadScenarios();
+  const sel = compareIds.map(id => list.find(s => s.id === id)).filter(Boolean);
+  if (!sel.length) { $("cmpWrap").innerHTML = `<p class="muted">Noch keine Szenarien zum Vergleich ausgewählt.</p>`; return; }
+  const models = sel.map(s => runModel({ ...Object.fromEntries(FIELDS.map(f => [f.id, f.def])), ...Object.fromEntries(CHECKS.map(c => [c.id, c.def])), ...s.inputs }));
+  const rows = [
+    ["Darlehensbetrag", m => eur(m.inp.betrag)],
+    ["Sollzins / Tilgung", m => `${pct(m.inp.sollzins)} / ${pct(m.inp.tilgung)}`],
+    ["Restschuld Ende Zinsbindung", m => eur(m.loan.restschuld)],
+    ["Monatliche Sparrate", m => eur2(m.sparrate)],
+    ["Bausparguthaben", m => eur(m.bs.guthaben)],
+    ["ETF-Rendite", m => pct(m.inp.etfRendite, 1)],
+    ["ETF netto", m => eur(m.etf.netto)],
+    ["Anschlusszins", m => pct(m.inp.anschlusszins)],
+    ["Rate ohne Sondertilgung", m => eur2(m.an.rateOhne)],
+    ["Rate mit ETF (eigene Annuität)", m => eur2(m.an.rateEtfEigen)],
+    ["Rate mit Bausparer (gesamt)", m => eur2(m.an.belastung)],
+    ["Laufzeit Bauspardarlehen", m => monthsText(m.an.laufzeitBs)],
+    ["Break-even-Anschlusszins", m => breakEvenText(m.breakEven).v],
+    ["Vorteil", m => { const w = winnerText(m.an.vorteilEtf); return `<b><span class="dot" style="background:${w.color}"></span>${w.name} +${eur(Math.abs(m.an.vorteilEtf))}</b>`; }],
+  ];
+  $("cmpWrap").innerHTML = `<table><thead><tr><th></th>${sel.map(s => `<th>${escapeHtml(s.name)}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map(([k, f]) => `<tr><td>${k}</td>${models.map(m => `<td>${f(m)}</td>`).join("")}</tr>`).join("") + "</tbody></table>";
+}
+
+/* =====================================================================
+   7) HAUPTSCHLEIFE
+   ===================================================================== */
+
+let pending = false;
+function recalc() {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => {
+    pending = false;
+    const inp = readInputs();
+    if (!inp) return;
+    const r = runModel(inp);
+    lastResult = r;
+    renderWarnings(r);
+    renderTiles(r);
+    renderRateTable(r);
+    renderCharts(r);
+    renderSensitivity(inp);
+  });
+}
+
+loadLocalEnv().then(() => {
+  buildForm();
+  $("scSave").addEventListener("click", saveScenario);
+  $("scName").addEventListener("keydown", e => { if (e.key === "Enter") saveScenario(); });
+  $("scList").addEventListener("click", onScenarioListClick);
+  try {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (lastResult) renderCharts(lastResult); });
+  } catch {}
+  renderScenarioList();
+  recalc();
+});
+</script>
+</body>
+</html>
